@@ -1,0 +1,17 @@
+Package: westernAuthoritarianism
+Type: Package that accompanies authoritarianism, ethnicity, and American Politics
+Title: Generates brms wrappers and functions used in the paper.
+Version: 0.1.0
+Author: Christopher Weber
+Maintainer: Christopher Weber: <chrisweber@arizona.edu>
+Description: This package accompanies Weber et al (2024) and contains the functions used to generate the results in the paper. The package contains a series of functions that wrap the brms package and generate the models used in the paper. The package also contains the data used in the paper.
+License: MIT + file LICENSE
+Encoding: UTF-8
+LazyData: true
+RoxygenNote: 7.3.1
+Imports:
+  brms,
+  stats
+Suggests:
+  knitr,
+  rmarkdown
