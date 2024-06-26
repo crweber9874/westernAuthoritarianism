@@ -20,3 +20,4 @@ ua_scale_color_diverging <- function(low_color = ua_red,
   scale_fill_gradient2(low = low_color, mid = mid_color,  high_color = high_color)
 }
 
+

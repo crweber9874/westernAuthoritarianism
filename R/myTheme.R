@@ -22,7 +22,7 @@ mytheme <- function(...){
   panel.background = ggplot2::element_rect(fill = "white"),
   legend.text = ggplot2::element_text(size = 14),
   legend.title = ggplot2::element_text(size = 16) )
-return(mytheme)
+return(ggtheme)
   }
 
 

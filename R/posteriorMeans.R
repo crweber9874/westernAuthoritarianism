@@ -15,41 +15,41 @@
 #' @export
 #'
 #
-
-posterior_means <- function(data = dataActive,
-                           xvar = "authM3",
-                           mvar = "latino",
-                           xval = seq(0, 1, 0.1),
-                           mval = c(0, 1),
-                           model = ideology,
-                           category_groups =
-                             list(Oppose = c(1, 2), Neutral = 3,
-                                  Support = c(3, 4))) {
+posterior_means <- function(
+    model = regressionModels$pid3,
+    xvar = "authM3",
+    mvar = "latino",
+    xval =  seq(0, 1, 0.1),
+    mval =  c(0, 1)
+) {
   formula     =    model$formula
-  regex       =    names(model$data)
-  # Filter data frame to exclude, xvar, mvar, and all variables in the model formula.
-  means       =   data[, setdiff(names(data), c(xvar, mvar))]
-  means       =   means[, (names(means) %in% regex)][,-1] %>% colMeans(na.rm = TRUE)
-  names   =    data[, (names(data) !=  xvar & names(data) != mvar)
-                    &  names(data) %in% regex][,-1] %>% names() %>% as.character()
-  dat = cbind(means) %>% t() %>% as.data.frame() %>% expand_grid(xvar = xval, mvar = mval)
-  #For xvar in dat, rename to xvar
-   names(dat)[names(dat) == "xvar"] <- xvar
-   names(dat)[names(dat) == "mvar"] <- mvar
-   dat = dat %>% add_epred_draws(model)
-   if(model$family[[1]] == "categorical" | model$family[[1]] == "cumulative"){
-     print("This is an multiple category ordinal or multinomial model.
-           The categories will be grouped together according to category_groups")
-     dat = pivot_wider(dat, names_from = .category, values_from = .epred)
-     for (group_name in names(category_groups)) {
-       dat[[group_name]] <- rowSums(dat[, as.character(category_groups[[group_name]]), drop = FALSE])
-     }
-   }
-   else{
-     print("This is a binary model")
-     dat <- dat %>%
-       rename(prob = .epred)
-   }
-  return(dat)
+  data =  model$data
+  cols_to_average <- setdiff(names(data)[-1], c(xvar, mvar))
+  data_grid <- data %>%
+    select(all_of(cols_to_average)) %>%
+    summarize(across(everything(), mean)) %>%
+    expand_grid(
+      !!xvar := xval,
+      !!mvar := mval
+    ) %>% add_epred_draws(model)
+  if (model$family[[1]] == "categorical" |
+      model$family[[1]] == "cumulative"){
+    print("categorical or cumulative")
+    plot = data_grid %>%
+      group_by(!!sym(xvar), !!sym(mvar), .category) %>%
+      summarize(
+        mean = mean(.epred),
+        lower = quantile(.epred, 0.025),
+        upper = quantile(.epred, 0.975))  }
+  if (model$family[[1]] == "bernoulli" |
+      model$family[[1]] == "gaussian"){
+    print("bernoulli or gaussian")
+    plot = data_grid %>%
+      group_by(!!sym(xvar), !!sym(mvar)) %>%
+      summarize(
+        mean = mean(.epred),
+        lower = quantile(.epred, 0.025),
+        upper = quantile(.epred, 0.975))
+  }
+  return(plot)
 }
-

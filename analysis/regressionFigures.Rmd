@@ -1,0 +1,627 @@
+---
+title: "Comparing Groups"
+---
+
+```{r setup, include=FALSE}
+# Delete stuff from directory
+unlink(c("dataActive.csv", "rWestern.dta"))
+```
+
+# Authoritarianism scores by Ethnicity
+
+This is how I load the data.
+
+```{r, message = FALSE, warning = FALSE, echo = FALSE}
+library(dplyr)
+library(rstan)
+library(tidyr)
+library(modelr)
+library(brms)
+library(tidybayes)
+library(ggplot2)
+library(simplecolors)
+library(patchwork)
+library(fastDummies)
+library(bayesplot)
+library(cowplot)
+
+# Data
+load("~/Dropbox/github_repos/westAuthoritarianism/westernAuthoritarianism/tmp/modelsR.rda")
+gcs_get_object("dataActive.csv", bucket = "grau_data", saveToDisk = "dataActive.csv", overwrite = TRUE)
+
+modDat <- read.csv("dataActive.csv") %>%
+  mutate(gen = factor(gen)) %>%
+  dummy_cols(select_columns = "gen") %>%
+  filter(race == "White" | race == "Hispanic") %>%
+  mutate(authSum = rowMeans(cbind(auth1, auth2, auth3, auth4), na.rm = TRUE)) %>%
+  mutate(authSum = zero.one(authSum)) %>%
+  mutate(authM1 = zero.one(m1.dif)) %>%
+  mutate(authM2 = zero.one(m2.dif)) %>%
+  mutate(authM3 = zero.one(mean_name)) 
+head(modDat)
+```
+
+## Data Description
+
+The first file is just the cleaned western data. The second is the regression models. The third is a list of latent variable models.
+
+```{r pressure, echo=FALSE, warning=FALSE, message=FALSE}
+# This is unique model, the rest use prebuilt functions. This is also how the functions work.
+
+# Data 
+ dat = modDat %>%
+      data_grid(
+                female  =  mean(female),
+                college =  mean(college),
+                income  =  mean(income),
+                latino =   c(0, 1),
+                married =  mean(married),
+                christian     =  mean(christian),
+                gen_Boomer    = mean(gen_Boomer),
+                gen_Greatest  = mean(gen_Greatest),
+                gen_Millenial = mean(gen_Millenial),
+               authM3 = c(0,1))  %>%
+      add_epred_draws(regressionModels[[1]]) %>%
+      group_by(authM3, latino, .category) %>%
+      mutate(latino = as.factor(ifelse(latino == 1, "Latino", "Non Hispanic White"))) %>%
+      pivot_wider(names_from = .category, values_from = .epred, names_prefix = "cat_") 
+head(dat)
+```
+
+These are the data reshaped in "wide" format to place the categories on the columns. Each entry refers to the probability that the simulated response lists this category as the most important. The data are grouped by the level of the moderator variable, Latino, and the level of the independent variable, authoritarianism.
+
+From here -- in a rather unconcise way -- generate plotDat, which is the mean marginal effect of the moderator variable, Latino, on the probability that the category is the most important. Then from these data, extract the necessary variables to calculate the marginal effect. The marginal effect is the difference in the probability that the category is the most important for the two levels of the moderator variable.
+
+Finally plot these effects
+
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 6}        
+
+plotDat =   dat %>%
+  filter(authM3 == 1) %>%
+  select(starts_with("cat") | latino) %>%
+  pivot_longer(
+    cols = starts_with("cat"),
+    names_to = "category",
+    values_to = "probability"
+  ) 
+
+maxX = plotDat %>%
+  subset(select = "probability")
+
+minX = dat %>%
+  filter(authM3 == 0) %>%
+  select(starts_with("cat")| latino) %>%
+  pivot_longer(
+    cols = starts_with("cat"),
+    names_to = "category",
+    values_to = "probability"
+  ) %>% 
+  subset(select = "probability")
+
+plot =  plotDat %>% 
+  select(latino, category) 
+
+plot$marginal_effect = maxX$probability - minX$probability
+
+plot = plot %>% 
+  group_by(latino, category) %>% 
+  summarize(
+    mean = mean(marginal_effect),
+    lower = quantile(marginal_effect, 0.025),
+    upper = quantile(marginal_effect, 0.975)
+  )
+
+head(plot)
+```
+```{r}
+# Width height
+options(repr.plot.width = 12, repr.plot.height = 6)
+plot = plot %>%
+  ggplot(
+    aes(
+      x = reorder(factor(category), mean),
+      y = mean, ymin = lower,
+      ymax = upper, group = latino, color = latino
+    )
+  ) +
+  geom_point(size = 2, position = position_dodge(width = 0.5), alpha = 0.75) +
+  geom_errorbar(width = 0.15, position = position_dodge(width = 0.5), alpha = 0.75, colour = "black") +
+  ggtitle("Marginal Effect of Authoritarianism") +
+  scale_y_continuous("Marginal Effect", limits = c(-0.5, 0.5)) +
+  geom_hline(yintercept = 0, colour = "black", linetype = "dashed") +
+  coord_flip() + 
+  # Change x axis to labels minus cat_ using a regex and upper case the first letter in the label
+  scale_x_discrete("Most Important Problem", labels =  stringr::str_to_title(gsub("cat_", "",         levels(factor(plot$category))))) +
+  theme(panel.background = element_rect(fill = "white")) +
+  # Add a caption
+  labs(caption = "Data come from the 2020 Western States Survey") +
+  #Change color to ua_color_qualitative
+  scale_color_manual("", values = c("#E63946", "#457B9D"))
+
+plot
+
+```
+There are some notable differences between Latinos and non Hispanic Whites with respect to the political expression of authoritarian values. The marginal effect of authoritarianism on stating that "Policing" is the most important problem is greater for non Hispanic Whites. Non Hispanic White Authoritarians and non-authoritarians differ on this item. There is a non-significant difference among Latinos.
+
+Negative values indicate that non-authoritarians rate the issue as more important, compared to authoritarians. There is a rather larger divide on "Covid" indicating that non-authoritarians are far more likely to rate the Covid pandemic as the most important problem. This effect is greater for non Hispanic Whites -- though the confidence regions overlap.   
+
+While authoritarians and non authoritarians differ in important ways -- authoritarians are more likely to rate issues like foreign trade and police/law and order as the most important problem; non-authoritarians rate Covid and the economy as more important. The differences between Latinos and non Hispanic Whites with respect to the expression of authoritarian values, however, is less clear. 
+
+We see some differences in the expression of authoritarian values across these groups. The authoritarian divide on the policing issue is more pronounced for non Hispanic Whites. The authoritarian divide on the economy is more pronounced for Latinos. Yet, what's important to note is that the marginal effect of authoritarianism is generally quite similar across these groups. The confidence region for the marginal effect of authoritarianism overlaps for these groups.
+
+## The Expression of Authoritarian Values on Policy
+
+The formula for all the regression models is:
+
+```{r}
+IV <- "female + latino + college + income + gen_Boomer + gen_Greatest +
+       gen_Millenial +  married + christian +  authM3 + authM3:latino"
+```
+
+And then depending on the nature of the dependent variable, a multinomial, ordinal, or binary model is used, the logit link used for the latter two, softmax for the first.
+
+Here is an example of a multinomial model. Let's predict partisanship with authoritarianism, and these variables. 
+
+```{r}
+regressionModels$pid3
+```
+
+Estimate the posterior means for the model. 
+
+```{r}
+xvar = "authM3"
+mvar = "latino"
+
+model = regressionModels$pid3
+
+formula     =    model$formula
+regex       =    names(model$data)
+modelData   =    model$data
+
+modelData   =    model$data %>%   
+    data_grid(
+      female  = mean(female) ,
+      college = mean(college), 
+      income  = mean(income),
+      latino  = c(0, 1),
+      married = mean(married),
+      christian = mean(christian),
+      gen_Boomer = mean(gen_Boomer),
+      gen_Greatest = mean(gen_Greatest),
+      gen_Millenial = mean(gen_Millenial),
+      authM3 = seq(0, 1, by = 0.1)) %>%
+    add_epred_draws(model) %>%
+    mutate(latino = as.character(ifelse(latino == 0, "Non Hispanic White", "Latino"))) 
+head(modelData)  
+```
+
+The data were generated using the `data_grid` function. The data are then used to generate the posterior estimates for the model. 
+
+Now we can pass this to ggplot.
+
+
+
+Authoritarianism is more clearly aligned with partisanship among non Hispanic Whites. These effects are far more striking than the policy items. It suggests that authoritarianism has not been mapped onto party identification among Latinos. Put another way, proportionately more Latino authoritarians should identify as Democrat, relative to non Hispanic White authoritarians.
+
+We can see this in a relatively simple comparison. Create a high, low, and middle value for authoritarianism. Then calculate the proportion of Latino's who are also authoritarian and Democrat. Likewise, calculate the proportion of non Hispanic Whites who are authoritarian and Democrat. Compare
+
+```{r}
+#We can see this in a relatively simple comparison. Create a high, low, and middle value for authoritarianism. Then calculate the proportion of Latino's who are also authoritarian and Democrat. Likewise, calculate the proportion of non Hispanic Whites who are authoritarian and Democrat. Compare
+compare = modDat %>%
+  mutate(authM3 = cut(authM3, breaks = c(0, 0.33, 0.66, 1), labels = c("low", "middle", "high"))) 
+
+prop.table(table(compare$authM3,  compare$party3, compare$latino), 2) %>% print()
+```
+
+If one is a latino and high on authoritarianism there is a 20% probability of identifying as Democrat. If one is a a non Hispanic White and high on authoritarianism there is a 8% probability of identifying as a Democrat. The inverse also holds. If one is a Latino and low on authoritarianism there is a 14% probability of identifying as a Republican. If one is a non Hispanic White and low on authoritarianism there is a 32% probability of identifying as a Republican.
+
+Let's also calculate the marginal effect of authoritarianism on party identification. This is be done much the same as the most important problem item, the primary difference being there are only two categories. After doing this one final time, I'll create a general function that 1) constructs the data appropriately, and 2) calculate the model predictions and plot the results. 
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+library(tidyr)
+library(dplyr)
+
+xvar = "authM3"
+mvar = "latino"
+model = regressionModels$pid3
+
+posterior_means(model = model) %>% head()
+
+
+    
+    
+    )
+
+
+  
+  plot1
+
+
+cols_to_average <- setdiff(names(model$data)[-1], c(xvar, mvar)) 
+data =  model$data 
+
+data_grid <- data %>%
+  select(all_of(cols_to_average)) %>%
+  summarize(across(everything(), mean)) %>%
+  expand_grid(
+    !!xvar := c(min(model$data[[xvar]]), max(model$data[[xvar]])),  # Use correct syntax to find min/max
+    !!mvar := c(min(model$data[[mvar]]), max(model$data[[mvar]]))
+)
+
+data_grid_with_predictions <- data_grid %>%
+    add_epred_draws(model)
+
+t1 = 
+  data_grid_with_predictions %>% 
+  filter(!!sym(xvar) == 1) %>%
+  subset(select = ".epred")
+ 
+t2 = (data_grid_with_predictions) %>% 
+  filter(!!sym(xvar) == 0) %>%
+  subset(select = ".epred")
+
+dat = data_grid_with_predictions %>%
+  filter(!!sym(xvar) == 0) 
+
+dat$me = t1$.epred - t2$.epred
+
+plot = dat %>%
+  subset(select = c("latino", ".category", "me"))  %>%
+  group_by(latino, .category) %>%
+  summarize(
+    mean = mean(me),
+    lower = quantile(me, 0.025),
+    upper = quantile(me, 0.975)
+  ) %>%
+  mutate(latino = as.factor(ifelse(latino == 0, "Non Hispanic White", "Latino"))) %>% 
+  mutate(.category = as.factor(ifelse(.category == 1, "Democrat", ifelse(.category == 2, "Independent", "Republican")))) 
+
+
+
+plot2 = plot %>%
+  ggplot(
+    aes(
+      x = .category,
+      y = mean, ymin = lower,
+      ymax = upper, group = as.factor(latino), color = as.factor(latino)
+    )
+  ) +
+  ggtheme + 
+  geom_point(size = 3, position = position_dodge(width = 0.5), alpha = 0.75) +
+  geom_errorbar(width = 0.15, position = position_dodge(width = 0.5), alpha = 0.75, colour = "black") +
+  ggtitle("Marginal Effect") +
+  scale_y_continuous("Marginal Effect", limits = c(-1, 1)) +
+  geom_hline(yintercept = 0, colour = "black", linetype = "dashed") +
+  coord_flip() + 
+  # Change x axis to labels minus cat_ using a regex and upper case the first letter in the label
+  theme(panel.background = element_rect(fill = "white")) +
+  # Add a caption
+  labs(caption = "Note: Data come from the 2020 Western States Survey") +
+  scale_x_discrete("Party Identification", labels = c("Democrat", "Independent", "Republican"))  +
+  scale_color_manual("", values = c("#E63946", "#457B9D")) +
+  theme(legend.position = "none")
+
+
+library(patchwork)  # Make sure to install and load the patchwork library
+
+# Adjust the widths
+combined_plot <- plot1 + plot2 + plot_layout(widths = c(1,1))  # Adjust the 3 and 1 to your liking
+
+# Display
+combined_plot
+
+```
+
+ 
+
+
+
+### Estimation and Summarization of Differential Item Functioning in the Authoritarianism Scale
+
+In the analysis folder, there is a file called "latent.R" which executes six IRT models. The model scripts are located here:
+
+\~/analysis/latent.R
+
+The model estimates -- they take a bit to run -- are located in the tmp folder:
+
+\~/tmp/models.rda
+
+The estimates -- a list -- include these six models:
+
+-   Two parameter logit model, with mean differences in authoritarianism by ethnicity (White vs. Latino) and varying difficulty and discrimination estimates by item x ethnicity. This might be called the "fully varying" model.
+-   Two parameter logit model, with mean differences in authoritarianism by ethnicity (White vs. Latino), and no differential item functioning by ethnicity.
+-   One parameter logit model, with mean differences in authoritarian, no differential item functioning by ethnicity. The DIF model is an improvement over the no DIF model. The two paramter IRT model is:
+-   Two parameter DIF model (same as above), with varying mean effects for party.
+-   Two parameter model (no DIF, same as above) with varying effects for party.
+
+The two parameter IRT model is:
+
+```{=tex}
+\begin{align*}
+P(X_{ij} = 1) &= \frac{1}{1 + \exp(\alpha_j ( \beta_j) - \theta_{i})}
+\end{align*}
+```
+Inside the parentheses: the difference between the latent variable and the item easiness. Multiply this by the discrimination parameter, or how discriminating the item is across levels of the latent variable.
+
+The DIF model is
+
+```{=tex}
+\begin{align*}
+P(X_{ij} = 1) &= \frac{1}{1 + \exp(\alpha_{j,k} (\beta_{j,k} + \gamma_{k,i}))}
+\end{align*}
+```
+This is generally correct, but it's often noted that the model is not identified. One solution is to fix the mean and variance of the latent variable to 0 and 1, respectively. In the Bayesian context, this is achieved by specifiying strong priors; in this case, a normal distribution with a mean of 0 and a standard deviation of 1.
+
+The model is written as a brms multilevel model; where responses are nested in item -- defined by two characteristics: easiness and discrimination -- and the and also depends on the latent variable. The model simply changes by adding a group level indicator to the item easiness and discrimination parameters.
+
+To explore parameters in Shiny:
+
+```{r}
+#launch_shinystan(models[[1]])
+```
+
+Here is the fully varying -- i.e., DIF model -- and the no DIF model.
+
+```{r}
+options(repr.plot.width = 12, repr.plot.height = 6)
+
+difM1 = models[[1]]
+difM2 = models[[2]]
+difM3 <- models[[3]]
+difM4 <- models[[4]]
+difM5 <- models[[5]]
+difM6 <- models[[6]]
+# Plot the model
+div_style <- parcoord_style_np(div_color = "green", div_size = 10, div_alpha = 0.4)
+
+nn <- nuts_params(difM1)
+
+theme_set(theme_default() + plot_bg(fill = "white", color = "transparent"))
+
+mcmc_pairs(difM1,
+  pars = c("b_eta_raceWhite", "b_eta_raceHispanic"),
+  np = nn,
+  off_diag_args = list(size = 0.75),
+  np_style = div_style
+)
+
+mcmc_trace(difM1, pars = c("b_eta_raceWhite", "b_eta_raceHispanic"), np = nn) +
+  xlab("Post-warmup iteration") + labs(title = "differential item functioning model")
+```
+
+```{r}
+# Plot the model
+div_style <- parcoord_style_np(div_color = "green", div_size = 10, div_alpha = 0.4)
+
+nn <- nuts_params(difM2)
+
+theme_set(theme_default() + plot_bg(fill = "white", color = "transparent"))
+
+
+mcmc_trace(difM2, pars = c("b_eta_raceWhite", "b_eta_raceHispanic"), np = nn) +
+  xlab("Post-warmup iteration") + labs(title = "no differential item functioning model")
+
+  mcmc_pairs(difM2,
+    pars = c("b_eta_raceWhite", "b_eta_raceHispanic"),
+
+  )
+
+```
+
+```{r}
+loo(difM1, difM2)
+```
+
+```{r}
+difM1
+```
+
+The fully varying model seems to provide a better "fit" relative to the fully constrained model.
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+a <- spread_draws(difM1, r_item__eta[item, race]) %>% # Extract draws for item difficulties
+  group_by(item, race) %>%
+  summarize(
+    mean = mean(r_item__eta),             # Mean difficulty
+    lower = quantile(r_item__eta, 0.025), # Lower bound of 95% credible interval
+    upper = quantile(r_item__eta, 0.975)  # Upper bound of 95% credible interval
+  ) %>%
+  mutate(race = ifelse(race == "Intercept", "White", "Latino")) 
+
+b <- spread_draws(difM1, r_item__logalpha[item, race]) %>% # Extract draws for item difficulties
+  group_by(item, race) %>%
+  summarize(
+    mean = mean(r_item__logalpha),             # Mean difficulty
+    lower = quantile(r_item__logalpha, 0.025), # Lower bound of 95% credible interval
+    upper = quantile(r_item__logalpha, 0.975)  # Upper bound of 95% credible interval
+  ) %>%
+  mutate(race = ifelse(race == "Intercept", "White", "Latino")) 
+
+plot =   ggplot(a,
+    aes(
+    x = factor(item),
+    y = mean, ymin = lower,
+    ymax = upper, color = race )) +
+  geom_point(size = 4, alpha = 0.5, position = position_dodge(width = 0.5)) +
+  geom_errorbar(width = .1, alpha = 0.9, position = position_dodge(width = 0.5)) +
+  ggtitle("Easiness Estimates") +
+  scale_y_continuous("Posterior Distribution", limits = c(-2, 2)) +
+  geom_hline(yintercept = 0, colour = "black", linetype = "dashed") +
+  scale_colour_manual(name = "", values = c("darkgrey", "black"), labels = c("Latino", "Non Hispanic White")) +
+  theme(legend.position = "bottom") +
+  coord_flip() +
+  # label the item axis with different names
+  scale_x_discrete("Child Rearing Items", labels = c("Respect Elders/Independent", "Obedience/Reliance", "Well-Behaved/Considerate", "Good Manners/Curiosity")) +
+    theme(
+      plot.title = element_text(size = 16, face = "plain")
+    )
+  
+plot
+```
+
+There isn't much going on with respect to the difficulty/easiness of the items. However, there are more substantial differences with respect to the discrimination values.
+
+```{r}
+  ggplot(b,
+    aes(
+    x = factor(item),
+    y = mean, ymin = lower,
+    ymax = upper, color = race )) +
+  geom_point(size = 4, alpha = 0.5, position = position_dodge(width = 0.5)) +
+  geom_errorbar(width = .1, alpha = 0.9, position = position_dodge(width = 0.5)) +
+  ggtitle("Item Discrimination Estimates (log)") +
+  scale_y_continuous("Posterior Distribution", limits = c(-2, 2)) +
+  geom_hline(yintercept = 0, colour = "black", linetype = "dashed") +
+  scale_colour_manual(name = "", values = c("darkgrey", "black"), labels = c("Latino", "Non Hispanic White")) +
+  theme(legend.position = "bottom") +
+  coord_flip() +
+  # label the item axis with different names
+  scale_x_discrete("Child Rearing Items", labels = c("Respect Elders/Independent", "Obedience/Reliance", "Well-Behaved/Considerate", "Good Manners/Curiosity")) +
+    theme(
+      plot.title = element_text(size = 16, face = "plain")
+    )
+
+```
+
+The authoritarian items are more discriminating for non-Hispanic Whites, meaning the items are better at distinguishing between levels of authoritarianism. A similar way of seeing this is to just calculate Cronbach's alpha for each group
+
+```{r}
+for(race in (c("White", "Hispanic"))){
+    print(race)
+    psych::alpha(cbind(df$auth1[df$race == race], df$auth2[df$race == race], df$auth3[df$race == race], df$auth4[df$race == race]))$total$raw_alpha %>% print()
+} 
+
+```
+
+The alpha estimate is marginally lower for Latinos, suggesting that the items are less discriminating for this group.
+
+Finally, here are the posterior estimates for the mean differences in authoritarianism, using the DIF and non DIF corrected model. Thus far, even though the DIF model is better, there aren't clear differences -- save for the discrimination estimates -- that the more complex model is better.
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+options(repr.plot.width = 5, repr.plot.height = 5)
+a = spread_draws(difM1, b_eta_raceWhite, b_eta_raceHispanic) %>%
+mutate(white  = b_eta_raceWhite) %>%
+mutate(latino = b_eta_raceHispanic) %>%
+# Filter for columsn begins with white or latino
+select(starts_with("white"), starts_with("latino")) %>%
+pivot_longer(cols = everything(), names_to = "group", values_to = "value")%>%
+mutate(group = ifelse(group == "white", "White", "Latino")) %>%
+ggplot(aes(
+      x = value, y = group
+    ))  +
+      stat_slab(aes(thickness = stat(pdf * n)), scale = 1, alpha = 0.85) +
+      stat_dotsinterval(side = "bottom", scale = 0.5, slab_size = .001, alpha = 0.5) +
+      scale_fill_manual(values = c("lightgrey", "lightgrey")) +
+      # Format the grid
+      ggtitle("Authoritarianism \n correcting for DIF") +
+      theme(plot.title = element_text(size = 15, face = "bold", hjust = 0.5)) +
+      scale_x_continuous("Latent Authoritarianism", limits = c(-5, 5)) +
+      scale_y_discrete("", limits = rev) +
+      theme(legend.position = "none")
+
+b = spread_draws(difM2, b_eta_raceWhite, b_eta_raceHispanic) %>%
+mutate(white  = b_eta_raceWhite) %>%
+mutate(latino = b_eta_raceHispanic) %>%
+# Filter for columsn begins with white or latino
+select(starts_with("white"), starts_with("latino")) %>%
+pivot_longer(cols = everything(), names_to = "group", values_to = "value")%>%
+mutate(group = ifelse(group == "white", "White", "Latino")) %>%
+ggplot(aes(
+      x = value, y = group
+    ))  +
+      stat_slab(aes(thickness = stat(pdf * n)), scale = 1, alpha = 0.85) +
+      stat_dotsinterval(side = "bottom", scale = 0.5, slab_size = .001, alpha = 0.5) +
+      scale_fill_manual(values = c("lightgrey", "lightgrey")) +
+      # Format the grid
+      ggtitle("Authoritarianism \n not Correcting for DIF") +
+      theme(plot.title = element_text(size = 15, face = "bold", hjust = 0.5)) +
+      scale_x_continuous("Latent Authoritarianism", limits = c(-5, 5)) +
+      scale_y_discrete("", limits = rev) +
+      theme(legend.position = "none")
+
+
+# Cowplot a and b
+a + b 
+```
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+a = spread_draws(difM5, b_eta_raceWhite, b_eta_raceHispanic, b_eta_as.factorparty32, b_eta_as.factorparty33) %>%
+mutate(whiteDem = b_eta_raceWhite) %>%
+mutate(whiteInd = b_eta_raceWhite + b_eta_as.factorparty32) %>%
+mutate(whiteRep = b_eta_raceWhite + b_eta_as.factorparty33) %>%
+mutate(latinoDem = b_eta_raceHispanic) %>%
+mutate(latinoInd = b_eta_raceHispanic + b_eta_as.factorparty32) %>%
+mutate(latinoRep = b_eta_raceHispanic + b_eta_as.factorparty33) %>%
+# Filter for columsn begins with white or latino
+select(starts_with("white"), starts_with("latino")) %>%
+pivot_longer(cols = everything(), names_to = "group", values_to = "value")  %>%
+mutate(ethnicity = ifelse(grepl("white", group, ignore.case = TRUE), "White", "Latino")) %>%
+  mutate(race = ifelse(grepl("Dem", group, ignore.case = TRUE), "Democrat",
+      ifelse(grepl("Ind", group, ignore.case = TRUE), "Independent", "Republican"))) %>%
+    ggplot(aes(
+      x = value, y = as.factor(ethnicity), fill = as.factor(ethnicity)
+    )) +
+    facet_wrap(~race, nrow = 3) +
+      stat_slab(aes(thickness = stat(pdf * n)), scale = 1, alpha = 0.85) +
+      stat_dotsinterval(side = "bottom", scale = 0.5, slab_size = .001, alpha = 0.5) +
+      scale_fill_manual(values = c("lightgrey", "lightgrey")) +
+      # Format the grid
+      ggtitle("Authoritarianism \n correcting for DIF") +
+      theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5)) +
+      scale_x_continuous("Latent Authoritarianism", limits = c(-5, 5)) +
+      scale_y_discrete("", limits = rev) +
+      theme(legend.position = "none")
+
+b = spread_draws(difM6, b_eta_raceWhite, b_eta_raceHispanic, b_eta_as.factorparty32, b_eta_as.factorparty33) %>%
+mutate(whiteDem = b_eta_raceWhite) %>%
+mutate(whiteInd = b_eta_raceWhite + b_eta_as.factorparty32) %>%
+mutate(whiteRep = b_eta_raceWhite + b_eta_as.factorparty33) %>%
+mutate(latinoDem = b_eta_raceHispanic) %>%
+mutate(latinoInd = b_eta_raceHispanic + b_eta_as.factorparty32) %>%
+mutate(latinoRep = b_eta_raceHispanic + b_eta_as.factorparty33) %>%
+# Filter for columsn begins with white or latino
+select(starts_with("white"), starts_with("latino")) %>%
+pivot_longer(cols = everything(), names_to = "group", values_to = "value")  %>%
+mutate(ethnicity = ifelse(grepl("white", group, ignore.case = TRUE), "White", "Latino")) %>%
+  mutate(race = ifelse(grepl("Dem", group, ignore.case = TRUE), "Democrat",
+      ifelse(grepl("Ind", group, ignore.case = TRUE), "Independent", "Republican"))) %>%
+    ggplot(aes(
+      x = value, y = as.factor(ethnicity), fill = as.factor(ethnicity)
+    )) +
+    facet_wrap(~race, nrow = 3) +
+      stat_slab(aes(thickness = stat(pdf * n)), scale = 1, alpha = 0.85) +
+      stat_dotsinterval(side = "bottom", scale = 0.5, slab_size = .001, alpha = 0.5) +
+      scale_fill_manual(values = c("lightgrey", "lightgrey")) +
+      # Format the grid
+      ggtitle("Authoritarianism \n not correcting for DIF") +
+      theme(plot.title = element_text(size = 20, face = "bold", hjust = 0.5)) +
+      scale_x_continuous("Latent Authoritarianism", limits = c(-5, 5)) +
+      scale_y_discrete("", limits = rev) +
+      theme(legend.position = "none")
+
+a + b 
+```
+
+```{r}
+
+dif1 = spreadDraw(difM1, mean_name = "m1.dif", lower_name = "l1.dif", upper_name = "u1.dif")
+dif2 = spreadDraw(difM2, mean_name = "m2.dif", lower_name = "l2.dif", upper_name = "u2.dif")
+noDIF = spread_draws(difM4, r_caseid[caseid, ]) %>%
+     group_by(caseid) %>%
+     summarize(
+       mean_name =  mean(r_caseid),
+       lower_name = quantile(r_caseid, 0.025),
+       upper_name = quantile(r_caseid, 0.975)
+      )
+# 
+dat =  df %>%
+  left_join(dif1, by = "caseid") %>%
+  left_join(dif2, by = "caseid") %>%
+  left_join(noDIF, by = "caseid")  
+
+dat %>% write.csv(file = "/Users/Chris/Dropbox/masterData/Western_States/git/westernStates/authoritarianismLatino/tmpdata.csv")
+
+gcs_upload_set_limit(300000000L)
+googleCloudStorageR::gcs_upload(file = dat, bucket = "grau_data", name = "dataActive.csv")
+```
