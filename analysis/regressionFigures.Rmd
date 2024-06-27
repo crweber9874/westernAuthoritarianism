@@ -24,6 +24,7 @@ library(patchwork)
 library(fastDummies)
 library(bayesplot)
 library(cowplot)
+library(googleCloudStorageR)
 
 # Data
 load("~/Dropbox/github_repos/westAuthoritarianism/westernAuthoritarianism/tmp/modelsR.rda")
@@ -46,7 +47,6 @@ head(modDat)
 The first file is just the cleaned western data. The second is the regression models. The third is a list of latent variable models.
 
 ```{r pressure, echo=FALSE, warning=FALSE, message=FALSE}
-# This is unique model, the rest use prebuilt functions. This is also how the functions work.
 
 # Data 
  dat = modDat %>%
@@ -198,13 +198,10 @@ head(modelData)
 
 The data were generated using the `data_grid` function. The data are then used to generate the posterior estimates for the model. 
 
-Now we can pass this to ggplot.
 
-
+A simple comparison. Create a high, low, and middle value for authoritarianism. Then calculate the proportion of Latino's who are also authoritarian and Democrat. Likewise, calculate the proportion of non Hispanic Whites who are authoritarian and Democrat. Compare
 
 Authoritarianism is more clearly aligned with partisanship among non Hispanic Whites. These effects are far more striking than the policy items. It suggests that authoritarianism has not been mapped onto party identification among Latinos. Put another way, proportionately more Latino authoritarians should identify as Democrat, relative to non Hispanic White authoritarians.
-
-We can see this in a relatively simple comparison. Create a high, low, and middle value for authoritarianism. Then calculate the proportion of Latino's who are also authoritarian and Democrat. Likewise, calculate the proportion of non Hispanic Whites who are authoritarian and Democrat. Compare
 
 ```{r}
 #We can see this in a relatively simple comparison. Create a high, low, and middle value for authoritarianism. Then calculate the proportion of Latino's who are also authoritarian and Democrat. Likewise, calculate the proportion of non Hispanic Whites who are authoritarian and Democrat. Compare
@@ -235,17 +232,6 @@ plotDat = posterior_means(model = model) %>%
     TRUE ~ NA
   ) ) 
 
-# %>% 
-#     mutate(.category = case_when(
-#     as.numeric(.category) == 1 ~ "Strongly Oppose",
-#     as.numeric(.category) == 2 ~ "Oppose",
-#     as.numeric(.category) == 3 ~ "Support",
-#     as.numeric(.category) == 4 ~ "Strongly Support",
-#     TRUE ~ NA
-#   ) ) %>%
-  #%>%# order .category
-  #mutate(.category = factor(.category, levels = c("Democrat", "Independent", "Republican")))
-
 plot1 = ggPoint(plotDat, nrow = 1)
 
 ```
@@ -256,7 +242,6 @@ plot1 = ggPoint(plotDat, nrow = 1)
 posterior_pme(model) %>% head(12)
 ```
 
-And the wrapper for the marginal effects **ggMarginal**
 
 ```{r}
 
@@ -274,6 +259,8 @@ plot1 +  ggMargins_categorical(plotData, nrow = 1, ylimits = c(-1, 1)) +
   plot_layout(heights = c(2, 1), widths = c(2.5, 1))
 
 ```
+
+Even though authoritarianism is expressed similarly in terms of policy, authoritarianism is far more electorally consequential among non Hispanic Whites. The marginal effect is much larger.  It's a similar story for voting. Authoritarianism shapes voting behavior more among non Hispanic Whites. 
 
 
 ```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 9}}
@@ -307,7 +294,7 @@ plot4 = posterior_pme(model = model) %>%
 
 names(regressionModels)
 ```
-
+Finally, let's plot the 
 
 ```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 9}}
 items <- read.csv(paste0(getwd(), "/helper/itemType.csv")) 
@@ -326,16 +313,30 @@ process_posterior <- function(model_data, recoder = "support5") {
       recoder == "support5" &  as.numeric(.category) == 3 ~ "Neither Support nor Oppose",
       recoder == "support5" &  as.numeric(.category) == 2 ~ "Somewhat Oppose",
       recoder == "support5" &  as.numeric(.category) == 1 ~ "Strongly Oppose",
-      recoder == "serious4" &  as.numeric(.category) == 5 ~ "Strongly Support",
-      recoder == "serious4" &  as.numeric(.category) == 4 ~ "Somewhat Support",
-      recoder == "serious4" &  as.numeric(.category) == 3 ~ "Neither Support nor Oppose",
-      recoder == "serious4" &  as.numeric(.category) == 2 ~ "Somewhat Oppose",
-      recoder == "serious4" &  as.numeric(.category) == 1 ~ "Strongly Oppose",
+      recoder == "serious4" &  as.numeric(.category) == 4 ~ "Extremely Serious",
+      recoder == "serious4" &  as.numeric(.category) == 3 ~ "A very serious problem",
+      recoder == "serious4" &  as.numeric(.category) == 2 ~ "Somewhat serious",
+      recoder == "serious4" &  as.numeric(.category) == 1 ~ "Not a problem",
       TRUE ~ NA
     )) 
 }
 
-a1 <- posterior_pme(model = models[[1]]) %>% process_posterior(recoder = "support5")
-a2 <- posterior_pme(model = models[[2]]) %>% process_posterior()
-a3 <- posterior_pme(model = models[[3]]) %>% process_posterior()
+ form = models[[1]]$formula 
+ 
+# Parse this  in a regex to extrac the first element "immUndocumented ~ female + latino"
+
+a1 <- posterior_pme(model = models[[1]]) %>% process_posterior(recoder = "support5") %>% mutate(type = "immUndocumented")
+a2 <- posterior_pme(model = models[[2]])  %>% process_posterior(recoder = "support5") %>% mutate(type = "immSeparation")
+a3 <- posterior_pme(model = models[[3]]) %>% process_posterior(recoder = "support5") %>% mutate(type = "immAsylum")
+a4 <- posterior_pme(model = models[[4]]) %>% process_posterior(recoder = "support5") %>% mutate(type = "immBirthright")
+a5 <- posterior_pme(model = models[[5]]) %>% process_posterior(recoder = "support5") %>% mutate(type = "immTech")
+a6 <- posterior_pme(model = models[[6]]) %>% process_posterior(recoder = "support5") %>% mutate(type = "immWall")
+a7 <- posterior_pme(model = models[[6]]) %>% process_posterior(recoder = "support5") %>% mutate(type = "concealCarry")
+a8 <- posterior_pme(model = models[[7]]) %>% process_posterior(recoder = "support5") %>% mutate(type = "background")
+a9 <- posterior_pme(model = models[[8]]) %>% process_posterior(recoder = "support5") %>% mutate(type = "registry")
+a10 <- posterior_pme(model = models[[10]]) %>% process_posterior(recoder = "support5") %>% mutate(type = "waterDams")
+a11 <- posterior_pme(model = models[[11]]) %>% process_posterior(recoder = "serious4") %>% mutate(type = "envWater")
+a12 <- posterior_pme(model = models[[12]]) %>% process_posterior(recoder = "support5") %>% mutate(type = "waterConservation")
+
+
 ```
