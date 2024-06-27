@@ -1,6 +1,14 @@
-
 #' @export
 ua_scale_color_qualitative <- function(){
+
+  ua_red=      "#AB0520"
+  ua_blue=     "#0C234B"
+  ua_chili=    "#8B0015"
+  ua_bloom=    "#EF4056"
+  ua_sky=      "#81D3EB"
+  ua_midnight= "#001C48"
+
+
   scale_color_manual(values = ua_red,
                      ua_blue,
                      ua_chili,

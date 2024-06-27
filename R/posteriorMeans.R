@@ -2,13 +2,11 @@
 #'
 #' Use category_groups to group categories together. The function asks the user to choose how to group
 #' the categories together, in order to aid interpretation with many category models (e.g. ordinal or multinomial models).
-#' @param data {dataframe used in brms model}
 #' @param model {brms model}
 #' @param xvar {independent variable}
 #' @param xrange {values of xvar}
 #' @param mvar {moderator variable}
 #' @param mrange {values of mvar}
-#' @param category_groups {list of categories to group together}
 #' @example #Not Run
 #'          ## posterior_means()
 #' @return R data frame with posterior predictions for each category, across levels of xvar, all other variables held at mean.

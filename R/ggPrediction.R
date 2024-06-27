@@ -24,6 +24,8 @@ ggPoint <- function(data = plotData,
                     ytitle = "Probability",
                     xlimits = c(0, 1),
                     ylimits = c(0, 1),
+                    facet_order = "default", # New parameter for facet order
+
                     ...) {
   plot <- data %>%
     ggplot2::ggplot(ggplot2::aes(
@@ -36,21 +38,29 @@ ggPoint <- function(data = plotData,
   ))
 
   if (model$family[[1]] == "cumulative" || model$family[[1]] == "categorical") {
-    plot <- plot + ggplot2::facet_wrap(~forcats::fct_rev(.category), ...)
+    # Apply facet ordering based on user input
+    if (facet_order == "default") {
+      plot <- plot + ggplot2::facet_wrap(~forcats::fct_rev(.category), ...)
+    } else if (facet_order == "reverse") {
+      plot <- plot + ggplot2::facet_wrap(~.category, ...)
+    } else {
+      # Assuming facet_order is a character vector specifying a custom order
+      plot <- plot + ggplot2::facet_wrap(~factor(.category, levels = facet_order), ...)
+    }
   }
 
   plot <- plot +
     ggplot2::geom_ribbon(alpha = 0.3, color = "lightgrey") +
     ggplot2::geom_line() +
     ggplot2::ggtitle(title) +
-    ggplot2::scale_y_continuous(ytitle, limits = xlimits) +
-    ggplot2::scale_x_continuous(xtitle, limits = ylimits) +
+    ggplot2::scale_y_continuous(ytitle, limits = ylimits) +
+    ggplot2::scale_x_continuous(xtitle, breaks = seq(xlimits[1], xlimits[2], by = 0.5)) +
     ggplot2::theme(legend.position = "bottom", legend.box = "vertical") +
     ggplot2::scale_color_manual("", values = c("#457B9D", "#E63946")) +
     ggplot2::theme(panel.background = ggplot2::element_rect(fill = "white")) +
     ggplot2::labs(caption = caption) +
     ggplot2::theme(
-      plot.title = ggplot2::element_text(face = "bold", hjust = 0, vjust = 0, colour = "#3C3C3C", size = 14),
+      plot.title = ggplot2::element_text(face = "bold", hjust = 0, vjust = 0, colour = "#3C3C3C", size = size_title),
       axis.text.x = ggplot2::element_text(size = size_x, colour = "#535353", face = "bold"),
       axis.text.y = ggplot2::element_text(size = size_y, colour = "#535353", face = "bold"),
       axis.title = ggplot2::element_text(size = size_title, colour = "#535353", face = "bold"),
