@@ -1,17 +1,13 @@
 ---
-title: "Comparing Groups"
+title: "Comparing Groups on Issues"
+output:
+  html_document:
+    df_print: paged
 ---
 
 ```{r setup, include=FALSE}
 # Delete stuff from directory
 unlink(c("dataActive.csv", "rWestern.dta"))
-```
-
-# Authoritarianism scores by Ethnicity
-
-This is how I load the data.
-
-```{r, message = FALSE, warning = FALSE, echo = FALSE}
 library(dplyr)
 library(rstan)
 library(tidyr)
@@ -23,8 +19,16 @@ library(simplecolors)
 library(patchwork)
 library(fastDummies)
 library(bayesplot)
+library(westernAuthoritarianism)
 library(cowplot)
 library(googleCloudStorageR)
+```
+
+# Authoritarianism scores by Ethnicity
+
+This is how I load the data.
+
+```{r, message = FALSE, warning = FALSE, echo = FALSE}
 
 # Data
 load("~/Dropbox/github_repos/westAuthoritarianism/westernAuthoritarianism/tmp/modelsR.rda")
@@ -74,8 +78,7 @@ From here -- in a rather unconcise way -- generate plotDat, which is the mean ma
 
 Finally plot these effects
 
-
-```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 12, fig.height = 6}        
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
 
 plotDat =   dat %>%
   filter(authM3 == 1) %>%
@@ -114,6 +117,7 @@ plot = plot %>%
 
 head(plot)
 ```
+
 ```{r}
 # Width height
 options(repr.plot.width = 12, repr.plot.height = 6)
@@ -142,11 +146,12 @@ plot = plot %>%
 plot
 
 ```
+
 There are some notable differences between Latinos and non Hispanic Whites with respect to the political expression of authoritarian values. The marginal effect of authoritarianism on stating that "Policing" is the most important problem is greater for non Hispanic Whites. Non Hispanic White Authoritarians and non-authoritarians differ on this item. There is a non-significant difference among Latinos.
 
-Negative values indicate that non-authoritarians rate the issue as more important, compared to authoritarians. There is a rather larger divide on "Covid" indicating that non-authoritarians are far more likely to rate the Covid pandemic as the most important problem. This effect is greater for non Hispanic Whites -- though the confidence regions overlap.   
+Negative values indicate that non-authoritarians rate the issue as more important, compared to authoritarians. There is a rather larger divide on "Covid" indicating that non-authoritarians are far more likely to rate the Covid pandemic as the most important problem. This effect is greater for non Hispanic Whites -- though the confidence regions overlap.
 
-While authoritarians and non authoritarians differ in important ways -- authoritarians are more likely to rate issues like foreign trade and police/law and order as the most important problem; non-authoritarians rate Covid and the economy as more important. The differences between Latinos and non Hispanic Whites with respect to the expression of authoritarian values, however, is less clear. 
+While authoritarians and non authoritarians differ in important ways -- authoritarians are more likely to rate issues like foreign trade and police/law and order as the most important problem; non-authoritarians rate Covid and the economy as more important. The differences between Latinos and non Hispanic Whites with respect to the expression of authoritarian values, however, is less clear.
 
 We see some differences in the expression of authoritarian values across these groups. The authoritarian divide on the policing issue is more pronounced for non Hispanic Whites. The authoritarian divide on the economy is more pronounced for Latinos. Yet, what's important to note is that the marginal effect of authoritarianism is generally quite similar across these groups. The confidence region for the marginal effect of authoritarianism overlaps for these groups.
 
@@ -161,13 +166,13 @@ IV <- "female + latino + college + income + gen_Boomer + gen_Greatest +
 
 And then depending on the nature of the dependent variable, a multinomial, ordinal, or binary model is used, the logit link used for the latter two, softmax for the first.
 
-Here is an example of a multinomial model. Let's predict partisanship with authoritarianism, and these variables. 
+Here is an example of a multinomial model. Let's predict partisanship with authoritarianism, and these variables.
 
 ```{r}
 regressionModels$pid3
 ```
 
-Estimate the posterior means for the model. 
+Estimate the posterior means for the model.
 
 ```{r}
 xvar = "authM3"
@@ -196,8 +201,7 @@ modelData   =    model$data %>%
 head(modelData)  
 ```
 
-The data were generated using the `data_grid` function. The data are then used to generate the posterior estimates for the model. 
-
+The data were generated using the `data_grid` function. The data are then used to generate the posterior estimates for the model.
 
 A simple comparison. Create a high, low, and middle value for authoritarianism. Then calculate the proportion of Latino's who are also authoritarian and Democrat. Likewise, calculate the proportion of non Hispanic Whites who are authoritarian and Democrat. Compare
 
@@ -213,7 +217,7 @@ prop.table(table(compare$authM3,  compare$party3, compare$latino), 2) %>% print(
 
 If one is a latino and high on authoritarianism there is a 20% probability of identifying as Democrat. If one is a a non Hispanic White and high on authoritarianism there is a 8% probability of identifying as a Democrat. The inverse also holds. If one is a Latino and low on authoritarianism there is a 14% probability of identifying as a Republican. If one is a non Hispanic White and low on authoritarianism there is a 32% probability of identifying as a Republican.
 
-Let's also calculate the marginal effect of authoritarianism on party identification. This is be done much the same as the most important problem item, the primary difference being there are only two categories. After doing this one final time, I'll create a general function that 1) constructs the data appropriately, and 2) calculate the model predictions and plot the results. 
+Let's also calculate the marginal effect of authoritarianism on party identification. This is be done much the same as the most important problem item, the primary difference being there are only two categories. After doing this one final time, I'll create a general function that 1) constructs the data appropriately, and 2) calculate the model predictions and plot the results.
 
 ```{r, echo = FALSE, message = FALSE, warning = FALSE}
 library(tidyr)
@@ -242,7 +246,6 @@ plot1 = ggPoint(plotDat, nrow = 1)
 posterior_pme(model) %>% head(12)
 ```
 
-
 ```{r}
 
 plotData = posterior_pme(model = model) %>%
@@ -260,10 +263,9 @@ plot1 +  ggMargins_categorical(plotData, nrow = 1, ylimits = c(-1, 1)) +
 
 ```
 
-Even though authoritarianism is expressed similarly in terms of policy, authoritarianism is far more electorally consequential among non Hispanic Whites. The marginal effect is much larger.  It's a similar story for voting. Authoritarianism shapes voting behavior more among non Hispanic Whites. 
+Even though authoritarianism is expressed similarly in terms of policy, authoritarianism is far more electorally consequential among non Hispanic Whites. The marginal effect is much larger. It's a similar story for voting. Authoritarianism shapes voting behavior more among non Hispanic Whites.
 
-
-```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 9}}
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
 #names(regressionModels)
 
 mvar = "latino"
@@ -294,11 +296,13 @@ plot4 = posterior_pme(model = model) %>%
 
 names(regressionModels)
 ```
-Finally, let's plot the 
 
-```{r, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 6, fig.height = 9}}
-items <- read.csv(paste0(getwd(), "/helper/itemType.csv")) 
+Finally, let's plot the
+
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+items <- read.csv("~/Dropbox/github_repos/westAuthoritarianism/westernAuthoritarianism/helper/itemType.csv")
   
+
 models = regressionModels[names(regressionModels) %in% items$question]
 nameModel = names(models)
 # Create a vector of variables not yet analyzed in this names(regressionModels)
@@ -339,4 +343,63 @@ a11 <- posterior_pme(model = models[[11]]) %>% process_posterior(recoder = "seri
 a12 <- posterior_pme(model = models[[12]]) %>% process_posterior(recoder = "support5") %>% mutate(type = "waterConservation")
 
 
+# Place these all in one data set
+plotData = rbind(a1, a2, a3, a4, a5, a6, a7, a8, a9, a10, a11, a12) %>% 
+  filter(.category %in% c("Somewhat Support", "Strongly Support")) %>%
+  left_join(items, by = c("type" = "question")) %>%
+  mutate(issue = ifelse(grepl("imm", type), "Immigration",
+                        ifelse(grepl("water", type), "Water", "Gun Control"))) %>%
+  mutate(type = factor(type, levels = c("immUndocumented", "immSeparation", "immAsylum", "immBirthright", "immTech", "immWall", "concealCarry", "background", "registry", "waterDams", "envWater", "waterConservation"))) 
+
+  # plotData %>% 
+  # ggplot(aes(y=mean, ymin=lower, ymax=upper, 
+  #            x=.category, colour=latino, group = latino)) + 
+  # facet_wrap (~type)+
+  # geom_linerange(aes(x=.category, ymax=mean, ymin=0), size = 1.25, position = position_dodge(width = 0.2)) +   scale_colour_manual(name="Latino", values=c("#0000ffe0", "#c20505"))+
+  # #scale_fill_grey() +
+  # geom_point(aes(y=mean,  x=.category, colour=latino), alpha=0.7, size = 2.1, position = position_dodge(width = 0.2))+
+  # #theme_bw() + 
+  # coord_flip() + 
+  # ggtitle("Latent Variable Support") +
+  # #  labs(caption="2020 Western States Study")+
+  # scale_y_continuous("Point Estimate")  +
+  # scale_x_discrete("")  +
+  # theme(legend.position = "bottom",
+  #       panel.grid = element_blank(),
+  #       #axis.title = element_blank(),
+  #       axis.ticks = element_blank(),
+  #       panel.background = element_blank(),
+  #       axis.text=element_text(size=8),
+  #       axis.text.x = element_text(angle=0),
+  #       plot.title = element_text(color="black", size=12)) 
+
+plot = plotData %>%
+  ggplot(
+    aes(
+      x = type,
+      y = mean, ymin = lower,
+      ymax = upper, group = latino, color = latino
+    )
+  ) +
+  facet_wrap(~.category, scales = "free") +
+  geom_point(size = 2, position = position_dodge(width = 0.5), alpha = 0.75) +
+  geom_errorbar(width = 0.15, position = position_dodge(width = 0.5), alpha = 0.75, colour = "black") +
+  ggtitle("Marginal Effect of Authoritarianism") +
+  scale_y_continuous("") +
+  scale_x_discrete("Issue") + 
+  geom_hline(yintercept = 0, colour = "black", linetype = "dashed") +
+  coord_flip() + 
+  # # Change x axis to labels minus cat_ using a regex and upper case the first letter in the label
+  # scale_x_discrete("Most Important Problem", labels =  stringr::str_to_title(gsub("cat_", "",         levels(factor(plot$category))))) +
+  theme(panel.background = element_rect(fill = "white")) +
+  # Add a caption
+  labs(caption = "Data come from the 2020 Western States Survey") +
+  #Change color to ua_color_qualitative
+  scale_color_manual("", values = c("#E63946", "#457B9D")) 
+  
+
+plot
+
 ```
+
+The support is generally more tepid, but always in a comparable direction, and for some issues, identical.

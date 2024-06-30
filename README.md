@@ -46,6 +46,6 @@ The package is structured as follows:
 
 3)  groupComparisons.Rmd. This file examines the charactericts of the latent variable measurement model specification
 
-4)  regressionFigures.Rmd. This file creates the figures used in the paper.
+4)  regressionFigures.Rmd. This file creates the figures used in the paper. The file includes the effects of authoritariansm X latino interactions on issues - immigration, environment, guns.
 
 5)  Data cleaning functions. The data cleaning functions are located in recode.r. They are used to clean the data, structure variables, and prepare the data for analysis. The output of recode.r is cWestern.rda, which is the cleaned Western States YouGov Survey data.

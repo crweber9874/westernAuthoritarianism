@@ -19,7 +19,7 @@ library(patchwork)
 library(fastDummies)
 library(googleCloudStorageR)
 
-source("/Users/Chris/Dropbox/masterData/Western_States/git/westernStates/authoritarianismLatino/helper/projectFunctions.R")
+source("~/authoritarianismLatino/helper/projectFunctions.R")
 
 gcs_get_object("rWestern.dta", bucket = "grau_data", saveToDisk = "rWestern.dta", overwrite = TRUE)
 # Read stata 13
@@ -970,7 +970,7 @@ df$treat <- ifelse(df$post_call == 0 & df$uncertainty == 1, 2, df$treat)
 df$treat <- ifelse(df$post_call == 1 & df$uncertainty == 1, 3, df$treat)
 
 df$strength <- abs(df$pid7 - 4) %>% zero.one()
-write.csv(df, file = "/Users/Chris/Dropbox/masterData/Western_States/westernCleaned.csv")
+write.csv(df, file = "/~/Western_States/westernCleaned.csv")
 gcs_upload_set_limit(300000000L)
 uploadData(df, "Western_States/westernCleaned.csv")
 
