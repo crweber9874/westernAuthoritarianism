@@ -22,11 +22,18 @@ library(bayesplot)
 library(westernAuthoritarianism)
 library(cowplot)
 library(googleCloudStorageR)
+```
+
+# Authoritarianism scores by Ethnicity
+
+This is how I load the data.
+
+```{r, message = FALSE, warning = FALSE, echo = FALSE}
+# Data
 load("~/Dropbox/github_repos/westAuthoritarianism/westernAuthoritarianism/tmp/modelsR.rda")
 # gcs_get_object("dataActive.csv", bucket = "grau_data", saveToDisk = "dataActive.csv", overwrite = TRUE)
 load("~/Dropbox/github_repos/westAuthoritarianism/westernAuthoritarianism/tmp/dataActive.rda")
-dataActive <<- dat
-modDat <- dataActive %>%
+modDat <- dat %>%
   mutate(gen = factor(gen)) %>%
   dummy_cols(select_columns = "gen") %>%
   filter(race == "White" | race == "Hispanic") %>%
@@ -36,20 +43,16 @@ modDat <- dataActive %>%
   mutate(authM2 = zero.one(m2.dif)) %>%
   mutate(authM3 = zero.one(mean_name)) 
 head(modDat)
-
 ```
-
-# Authoritarianism scores by Ethnicity
-
 
 ## Data Description
 
 The first file is just the cleaned western data. The second is the regression models. The third is a list of latent variable models.
 
-```{r, cache = TRUE}
+```{r pressure, echo=FALSE, warning=FALSE, message=FALSE}
 
 # Data 
- tmpdat <- modDat %>%
+ dat = modDat %>%
       data_grid(
                 female  =  mean(female),
                 college =  mean(college),
@@ -65,7 +68,7 @@ The first file is just the cleaned western data. The second is the regression mo
       group_by(authM3, latino, .category) %>%
       mutate(latino = as.factor(ifelse(latino == 1, "Latino", "Non Hispanic White"))) %>%
       pivot_wider(names_from = .category, values_from = .epred, names_prefix = "cat_") 
-head(tmpdat)
+head(dat)
 ```
 
 These are the data reshaped in "wide" format to place the categories on the columns. Each entry refers to the probability that the simulated response lists this category as the most important. The data are grouped by the level of the moderator variable, Latino, and the level of the independent variable, authoritarianism.
@@ -74,9 +77,9 @@ From here -- in a rather unconcise way -- generate plotDat, which is the mean ma
 
 Finally plot these effects
 
-```{r, cache = TRUE}
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
 
-plotDat =   tmpdat %>%
+plotDat =   dat %>%
   filter(authM3 == 1) %>%
   select(starts_with("cat") | latino) %>%
   pivot_longer(
@@ -88,7 +91,7 @@ plotDat =   tmpdat %>%
 maxX = plotDat %>%
   subset(select = "probability")
 
-minX = tmpdat %>%
+minX = dat %>%
   filter(authM3 == 0) %>%
   select(starts_with("cat")| latino) %>%
   pivot_longer(
@@ -114,7 +117,7 @@ plot = plot %>%
 head(plot)
 ```
 
-```{r, cache = TRUE}
+```{r}
 # Width height
 options(repr.plot.width = 12, repr.plot.height = 6)
 plot = plot %>%
@@ -155,7 +158,7 @@ We see some differences in the expression of authoritarian values across these g
 
 The formula for all the regression models is:
 
-```{r, cache = TRUE}
+```{r}
 IV <- "female + latino + college + income + gen_Boomer + gen_Greatest +
        gen_Millenial +  married + christian +  authM3 + authM3:latino"
 ```
@@ -164,13 +167,13 @@ And then depending on the nature of the dependent variable, a multinomial, ordin
 
 Here is an example of a multinomial model. Let's predict partisanship with authoritarianism, and these variables.
 
-```{r, cache = TRUE}
+```{r}
 regressionModels$pid3
 ```
 
 Estimate the posterior means for the model.
 
-```{r, cache = TRUE}
+```{r}
 xvar = "authM3"
 mvar = "latino"
 
@@ -203,7 +206,7 @@ A simple comparison. Create a high, low, and middle value for authoritarianism. 
 
 Authoritarianism is more clearly aligned with partisanship among non Hispanic Whites. These effects are far more striking than the policy items. It suggests that authoritarianism has not been mapped onto party identification among Latinos. Put another way, proportionately more Latino authoritarians should identify as Democrat, relative to non Hispanic White authoritarians.
 
-```{r, cache = TRUE}
+```{r}
 #We can see this in a relatively simple comparison. Create a high, low, and middle value for authoritarianism. Then calculate the proportion of Latino's who are also authoritarian and Democrat. Likewise, calculate the proportion of non Hispanic Whites who are authoritarian and Democrat. Compare
 compare = modDat %>%
   mutate(authM3 = cut(authM3, breaks = c(0, 0.33, 0.66, 1), labels = c("low", "middle", "high"))) 
@@ -215,13 +218,15 @@ If one is a latino and high on authoritarianism there is a 20% probability of id
 
 Let's also calculate the marginal effect of authoritarianism on party identification. This is be done much the same as the most important problem item, the primary difference being there are only two categories. After doing this one final time, I'll create a general function that 1) constructs the data appropriately, and 2) calculate the model predictions and plot the results.
 
-```{r, cache = TRUE}
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
+library(tidyr)
+library(dplyr)
 
 xvar = "authM3"
 mvar = "latino"
 model = regressionModels$pid3
 
-plotDat = posterior_means(model = regressionModels$pid3) %>%
+plotDat = posterior_means(model = model) %>%
   mutate(latino = as.factor(ifelse(latino == 0, "Non Hispanic White", "Latino"))) %>%
   mutate(.category = case_when(
     as.numeric(.category) == 1 ~ "Democrat",
@@ -230,18 +235,17 @@ plotDat = posterior_means(model = regressionModels$pid3) %>%
     TRUE ~ NA
   ) )
 
-
-plot1 = ggPoint(plotDat, nrow = 1, model = model)
+plot1 = ggPoint(plotDat, nrow = 1)
 
 ```
 
 *posterior_means* will calculate the posterior predictions for a model. *ggPoint* is a ggplot wrapper to plot the predictive effects. The functions can be used with nominal, ordinal, binary, and continuous dependent variables. And here is a a general function to create the marginal effects.
 
-```{r, cache = TRUE}
+```{r}
 posterior_pme(model) %>% head(12)
 ```
 
-```{r, cache = TRUE}
+```{r}
 
 plotData = posterior_pme(model = model) %>%
   mutate(latino = as.factor(ifelse(latino == 0, "Non Hispanic White", "Latino"))) %>%
@@ -260,7 +264,7 @@ plot1 +  ggMargins_categorical(plotData, nrow = 1, ylimits = c(-1, 1)) +
 
 Even though authoritarianism is expressed similarly in terms of policy, authoritarianism is far more electorally consequential among non Hispanic Whites. The marginal effect is much larger. It's a similar story for voting. Authoritarianism shapes voting behavior more among non Hispanic Whites.
 
-```{r, cache = TRUE}
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
 #names(regressionModels)
 
 mvar = "latino"
@@ -294,7 +298,7 @@ names(regressionModels)
 
 Finally, let's plot the
 
-```{r, cache = TRUE}
+```{r, echo = FALSE, message = FALSE, warning = FALSE}
 items <- read.csv("~/Dropbox/github_repos/westAuthoritarianism/westernAuthoritarianism/helper/itemType.csv")
   
 

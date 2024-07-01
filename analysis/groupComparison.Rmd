@@ -26,12 +26,12 @@ library(patchwork)
 library(fastDummies)
 library(bayesplot)
 library(cowplot)
-
+library(westernAuthoritarianism)
 # Data
 load("/Users/Chris/Dropbox/masterData/Western_States/git/westernStates/data/westernCleaned.rda")
 # Models
-load("~/Dropbox/github_repos/westernAuthoritarianism/westernAuthoritarianism/tmp/modelsR.rda")
-load("~/Dropbox/github_repos/westernAuthoritarianism/westernAuthoritarianism/tmp/models.rda")
+load("~/Dropbox/github_repos/westAuthoritarianism/westernAuthoritarianism/tmp/modelsR.rda")
+load("~/Dropbox/github_repos/westAuthoritarianism/westernAuthoritarianism/tmp/models.rda")
 ```
 
 ## Data Description
@@ -348,6 +348,8 @@ dat =  df %>%
 
 dat %>% write.csv(file = "/Users/Chris/Dropbox/masterData/Western_States/git/westernStates/authoritarianismLatino/tmpdata.csv")
 
-gcs_upload_set_limit(300000000L)
-googleCloudStorageR::gcs_upload(file = dat, bucket = "grau_data", name = "dataActive.csv")
+save(dat, file = "~/Dropbox/github_repos/westAuthoritarianism/westernAuthoritarianism/tmp/dataActive.rda")
+
+# gcs_upload_set_limit(300000000L)
+# googleCloudStorageR::gcs_upload(file = dat, bucket = "grau_data", name = "dataActive.csv")
 ```

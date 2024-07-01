@@ -15,6 +15,7 @@
 
 
 ggPoint <- function(data = plotData,
+                    model = model,
                     size_x = 10,
                     size_y = 10,
                     size_title = 12,
